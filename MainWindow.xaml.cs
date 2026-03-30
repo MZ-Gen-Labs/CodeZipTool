@@ -62,7 +62,6 @@ namespace CodeZipTool
         // ----------------------------------------------------
         private void BtnBrowseOutput_Click(object sender, RoutedEventArgs e)
         {
-            // ★修正箇所：.NET 8 標準の WPF 用フォルダ選択ダイアログを使用
             var dialog = new Microsoft.Win32.OpenFolderDialog
             {
                 Title = "ZIPファイルの保存先フォルダを選択してください"
@@ -77,7 +76,6 @@ namespace CodeZipTool
 
         private void BtnAddTarget_Click(object sender, RoutedEventArgs e)
         {
-            // ★修正箇所：.NET 8 標準の WPF 用フォルダ選択ダイアログを使用
             var dialog = new Microsoft.Win32.OpenFolderDialog
             {
                 Title = "圧縮したい対象のフォルダを選択してください"
@@ -110,7 +108,6 @@ namespace CodeZipTool
                 return;
             }
 
-            // 除外リストの作成
             var excludeList = new List<string>();
             if (ChkGit.IsChecked == true) excludeList.Add(".git");
             if (ChkVs.IsChecked == true) excludeList.Add(".vs");
@@ -133,7 +130,6 @@ namespace CodeZipTool
                 string zipFileName = $"{dirName}_{timestamp}.zip";
                 string zipFilePath = Path.Combine(TxtOutputDir.Text, zipFileName);
 
-                // 同名ファイルがある場合は連番を付与
                 int counter = 1;
                 while (File.Exists(zipFilePath))
                 {
@@ -171,12 +167,24 @@ namespace CodeZipTool
         {
             DirectoryInfo di = new DirectoryInfo(currentDir);
 
-            // 除外対象のフォルダ名なら処理をスキップ
+            // 【追加】隠しフォルダ（.git, .vs, .idea等）なら処理をスキップ
+            if (di.Attributes.HasFlag(FileAttributes.Hidden)) return;
+
+            // UIで指定された除外対象フォルダならスキップ
             if (excludeList.Contains(di.Name.ToLower())) return;
+
+            // 【追加】AIのコード検証に不要なバイナリ・画像等の拡張子リスト
+            var excludeExtensions = new List<string> { ".exe", ".dll", ".png", ".jpg", ".jpeg", ".gif", ".zip", ".pdb", ".ico" };
 
             // ファイルをZIPに追加
             foreach (FileInfo file in di.GetFiles())
             {
+                // 【追加】隠しファイルならスキップ
+                if (file.Attributes.HasFlag(FileAttributes.Hidden)) continue;
+
+                // 【追加】不要な拡張子ならスキップ
+                if (excludeExtensions.Contains(file.Extension.ToLower())) continue;
+
                 string entryName = Path.GetRelativePath(baseDir, file.FullName);
                 entryName = entryName.Replace('\\', '/'); 
                 archive.CreateEntryFromFile(file.FullName, entryName);
