@@ -45,7 +45,11 @@ namespace CodeZipTool
             _settings.TargetFolders.Clear();
             foreach (var item in LstTargetFolders.Items)
             {
-                _settings.TargetFolders.Add(item.ToString());
+                string? folderPath = item?.ToString();
+                if (!string.IsNullOrEmpty(folderPath))
+                {
+                    _settings.TargetFolders.Add(folderPath);
+                }
             }
             _settings.OutputDirectory = TxtOutputDir.Text;
 
@@ -58,24 +62,32 @@ namespace CodeZipTool
         // ----------------------------------------------------
         private void BtnBrowseOutput_Click(object sender, RoutedEventArgs e)
         {
-            using var dialog = new System.Windows.Forms.FolderBrowserDialog();
-            dialog.Description = "ZIPファイルの保存先フォルダを選択してください";
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            // ★修正箇所：.NET 8 標準の WPF 用フォルダ選択ダイアログを使用
+            var dialog = new Microsoft.Win32.OpenFolderDialog
             {
-                TxtOutputDir.Text = dialog.SelectedPath;
+                Title = "ZIPファイルの保存先フォルダを選択してください"
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                TxtOutputDir.Text = dialog.FolderName;
                 SaveSettings();
             }
         }
 
         private void BtnAddTarget_Click(object sender, RoutedEventArgs e)
         {
-            using var dialog = new System.Windows.Forms.FolderBrowserDialog();
-            dialog.Description = "圧縮したい対象のフォルダを選択してください";
-            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            // ★修正箇所：.NET 8 標準の WPF 用フォルダ選択ダイアログを使用
+            var dialog = new Microsoft.Win32.OpenFolderDialog
             {
-                if (!LstTargetFolders.Items.Contains(dialog.SelectedPath))
+                Title = "圧縮したい対象のフォルダを選択してください"
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                if (!LstTargetFolders.Items.Contains(dialog.FolderName))
                 {
-                    LstTargetFolders.Items.Add(dialog.SelectedPath);
+                    LstTargetFolders.Items.Add(dialog.FolderName);
                     SaveSettings();
                 }
             }
@@ -113,8 +125,8 @@ namespace CodeZipTool
 
             foreach (var item in LstTargetFolders.Items)
             {
-                string targetPath = item.ToString();
-                if (!Directory.Exists(targetPath)) continue;
+                string? targetPath = item?.ToString();
+                if (string.IsNullOrEmpty(targetPath) || !Directory.Exists(targetPath)) continue;
 
                 string dirName = new DirectoryInfo(targetPath).Name;
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
