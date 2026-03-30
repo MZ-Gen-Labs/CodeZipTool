@@ -18,9 +18,6 @@ namespace CodeZipTool
             LoadSettings();
         }
 
-        // ----------------------------------------------------
-        // 1. 設定の保存・読み込み処理
-        // ----------------------------------------------------
         private void LoadSettings()
         {
             if (File.Exists(SettingsFile))
@@ -29,14 +26,13 @@ namespace CodeZipTool
                 {
                     string json = File.ReadAllText(SettingsFile);
                     _settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
-                    
                     TxtOutputDir.Text = _settings.OutputDirectory;
                     foreach (var folder in _settings.TargetFolders)
                     {
                         LstTargetFolders.Items.Add(folder);
                     }
                 }
-                catch { /* 読み込み失敗時は初期状態 */ }
+                catch { }
             }
         }
 
@@ -46,27 +42,16 @@ namespace CodeZipTool
             foreach (var item in LstTargetFolders.Items)
             {
                 string? folderPath = item?.ToString();
-                if (!string.IsNullOrEmpty(folderPath))
-                {
-                    _settings.TargetFolders.Add(folderPath);
-                }
+                if (!string.IsNullOrEmpty(folderPath)) _settings.TargetFolders.Add(folderPath);
             }
             _settings.OutputDirectory = TxtOutputDir.Text;
-
             string json = JsonSerializer.Serialize(_settings, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(SettingsFile, json);
         }
 
-        // ----------------------------------------------------
-        // 2. ボタンクリック時のイベント処理
-        // ----------------------------------------------------
         private void BtnBrowseOutput_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new Microsoft.Win32.OpenFolderDialog
-            {
-                Title = "ZIPファイルの保存先フォルダを選択してください"
-            };
-
+            var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "ZIPファイルの保存先フォルダを選択してください" };
             if (dialog.ShowDialog() == true)
             {
                 TxtOutputDir.Text = dialog.FolderName;
@@ -76,11 +61,7 @@ namespace CodeZipTool
 
         private void BtnAddTarget_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new Microsoft.Win32.OpenFolderDialog
-            {
-                Title = "圧縮したい対象のフォルダを選択してください"
-            };
-
+            var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "圧縮したい対象のフォルダを選択してください" };
             if (dialog.ShowDialog() == true)
             {
                 if (!LstTargetFolders.Items.Contains(dialog.FolderName))
@@ -112,14 +93,9 @@ namespace CodeZipTool
             if (ChkGit.IsChecked == true) excludeList.Add(".git");
             if (ChkVs.IsChecked == true) excludeList.Add(".vs");
             if (ChkNodeModules.IsChecked == true) excludeList.Add("node_modules");
-            if (ChkBinObj.IsChecked == true)
-            {
-                excludeList.Add("bin");
-                excludeList.Add("obj");
-            }
+            if (ChkBinObj.IsChecked == true) { excludeList.Add("bin"); excludeList.Add("obj"); }
 
             int successCount = 0;
-
             foreach (var item in LstTargetFolders.Items)
             {
                 string? targetPath = item?.ToString();
@@ -127,14 +103,12 @@ namespace CodeZipTool
 
                 string dirName = new DirectoryInfo(targetPath).Name;
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                string zipFileName = $"{dirName}_{timestamp}.zip";
-                string zipFilePath = Path.Combine(TxtOutputDir.Text, zipFileName);
+                string zipFilePath = Path.Combine(TxtOutputDir.Text, $"{dirName}_{timestamp}.zip");
 
                 int counter = 1;
                 while (File.Exists(zipFilePath))
                 {
-                    zipFileName = $"{dirName}_{timestamp}_{counter}.zip";
-                    zipFilePath = Path.Combine(TxtOutputDir.Text, zipFileName);
+                    zipFilePath = Path.Combine(TxtOutputDir.Text, $"{dirName}_{timestamp}_{counter}.zip");
                     counter++;
                 }
 
@@ -148,49 +122,33 @@ namespace CodeZipTool
                     MessageBox.Show($"[{dirName}] の圧縮中にエラーが発生しました。\n{ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
-
             MessageBox.Show($"{successCount}個のフォルダの圧縮が完了しました！", "完了", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-        // ----------------------------------------------------
-        // 3. ZIP圧縮のコアロジック
-        // ----------------------------------------------------
         private void CreateZipFromDirectory(string sourceDir, string zipPath, List<string> excludeList)
         {
             using FileStream zipToOpen = new FileStream(zipPath, FileMode.Create);
             using ZipArchive archive = new ZipArchive(zipToOpen, ZipArchiveMode.Create);
-            
             AddFilesToZip(archive, sourceDir, sourceDir, excludeList);
         }
 
         private void AddFilesToZip(ZipArchive archive, string currentDir, string baseDir, List<string> excludeList)
         {
             DirectoryInfo di = new DirectoryInfo(currentDir);
-
-            // 【追加】隠しフォルダ（.git, .vs, .idea等）なら処理をスキップ
             if (di.Attributes.HasFlag(FileAttributes.Hidden)) return;
-
-            // UIで指定された除外対象フォルダならスキップ
             if (excludeList.Contains(di.Name.ToLower())) return;
 
-            // 【追加】AIのコード検証に不要なバイナリ・画像等の拡張子リスト
             var excludeExtensions = new List<string> { ".exe", ".dll", ".png", ".jpg", ".jpeg", ".gif", ".zip", ".pdb", ".ico" };
 
-            // ファイルをZIPに追加
             foreach (FileInfo file in di.GetFiles())
             {
-                // 【追加】隠しファイルならスキップ
                 if (file.Attributes.HasFlag(FileAttributes.Hidden)) continue;
-
-                // 【追加】不要な拡張子ならスキップ
                 if (excludeExtensions.Contains(file.Extension.ToLower())) continue;
 
-                string entryName = Path.GetRelativePath(baseDir, file.FullName);
-                entryName = entryName.Replace('\\', '/'); 
+                string entryName = Path.GetRelativePath(baseDir, file.FullName).Replace('\\', '/');
                 archive.CreateEntryFromFile(file.FullName, entryName);
             }
 
-            // サブフォルダを再帰的に処理
             foreach (DirectoryInfo subDir in di.GetDirectories())
             {
                 AddFilesToZip(archive, subDir.FullName, baseDir, excludeList);
