@@ -5,6 +5,14 @@ on:
     tags:
       - 'v*'
 
+# 1. リリース作成のために書き込み権限を明示的に追加
+permissions:
+  contents: write
+
+# 2. Node.js 24を使用するように環境変数を設定
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: windows-latest
